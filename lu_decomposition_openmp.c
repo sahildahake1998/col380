@@ -72,6 +72,7 @@ int main(int argc, char *argv[]){
                     stopIndex = n;
                 }
                 max = a[startIndex][k];
+                k_dash = startIndex;
                 for(i = startIndex+1; i < stopIndex; i++){
                     if(max < abs(a[i][k])){
                         max = abs(a[i][k]);
@@ -90,9 +91,6 @@ int main(int argc, char *argv[]){
                     k_dash = k_dashArray[i];
                 }
             }
-
-
-
 
             // max = 0;
             // for(i=k;i<n;i++){
@@ -134,7 +132,6 @@ int main(int argc, char *argv[]){
 
             #pragma omp parallel for num_threads(max_threads) collapse(2)
             for(i=k+1;i<n;i++){
-                // printf("%d %d\n",id, nthrds);
                 for(j=k+1;j<n;j++){
                     a[i][j] -= l[i][k]*u[k][j];
                 }

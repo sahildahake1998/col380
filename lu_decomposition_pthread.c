@@ -1,7 +1,6 @@
 #include<stdio.h>
 #include<stdlib.h>
 #include<sys/time.h>
-// #include<omp.h>
 #include<string.h>
 #include<pthread.h>
 #define N 10000
@@ -22,35 +21,44 @@ void swap(double *x, double *y){
     *y = temp; 
 } 
 
-struct max_arg_struct{
-    int threadID;
-};
-
 void* maximum(void* arg){
-    int i, myThreadID = threadID;
-    threadID++;
-    // printf("(%d)\n", myThreadID);
-    int maxs = 0;
-    // int k = ((struct max_arg_struct*)arg)->k;
-    int maxk;
-    for(i=myThreadID*n/max_threads; i<(myThreadID+1)*(n/max_threads);i++){ 
+    int i, myThreadID = threadID++;
+    int n_dash = (n/max_threads);
+    int startIndex = myThreadID*n_dash;
+    int stopIndex;
+    if(myThreadID != max_threads-1){
+        stopIndex = startIndex + n_dash;
+    }
+    else{
+        stopIndex = n;
+    }
+    double maxs = a[startIndex][k];
+    int maxk = startIndex; 
+    for(i=startIndex+1; i<stopIndex; i++){ 
         if(a[i][k] > maxs){
             maxs = a[i][k];
             maxk = i;
         }
-    } 
+    }
     localMax[myThreadID] = maxs;
     maxK[myThreadID] = maxk;
     pthread_exit(NULL);
 }
 
-
 void* computeA(void* arg){
-    int i, j, myThreadID = threadID;
-    threadID++;
-    for(i=myThreadID*(n-k-1)/max_threads;i<(myThreadID+1)*((n-k-1)/max_threads);i++){
+    int i, j, myThreadID = threadID++;
+    int n_dash = (n-k-1)/max_threads;
+    int startIndex = k+1+(myThreadID*n_dash);
+    int stopIndex;
+    if(myThreadID != max_threads-1){
+        stopIndex = startIndex + n_dash;
+    }
+    else{
+        stopIndex = n;
+    }
+    for(i=startIndex;i<stopIndex;i++){
         for(j=k+1;j<n;j++){
-            a[i+k+1][j] -= l[i+k+1][k]*u[k][j];
+            a[i][j] -= l[i][k]*u[k][j];
         }
     }
     pthread_exit(NULL);
@@ -105,7 +113,6 @@ int main(int argc, char *argv[]){
             }
         }
 
-        struct max_arg_struct *argument = (struct max_arg_struct *)malloc(sizeof(struct max_arg_struct));
         pthread_t threads[max_threads];
         printf("Entered the main forloop\n");
 
@@ -117,11 +124,12 @@ int main(int argc, char *argv[]){
             }
 
             for (i = 0; i<max_threads; i++){
-                pthread_join(threads[i], NULL);       
+                pthread_join(threads[i], NULL);
             }
             
-            max = 0;
-            for (i = 0; i < max_threads; i++){
+            max = localMax[0];
+            k_dash = maxK[0];
+            for (i = 1; i < max_threads; i++){
                 if(localMax[i] > max){
                     max = localMax[i];
                     k_dash = maxK[i];
@@ -149,10 +157,13 @@ int main(int argc, char *argv[]){
                 l[i][k] = a[i][k]/u[k][k];
                 u[k][i] = a[k][i];
             }
+            
             threadID = 0;
+            
             for(i=0;i<max_threads;i++){
                 pthread_create(&threads[i], NULL, &computeA, NULL);
             }
+            
             for (i = 0; i<max_threads; i++){
                 pthread_join(threads[i], NULL);
             }

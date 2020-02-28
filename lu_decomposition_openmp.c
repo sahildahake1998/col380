@@ -132,7 +132,6 @@ int main(int argc, char *argv[]){
 
             #pragma omp parallel for num_threads(max_threads) collapse(2)
             for(i=k+1;i<n;i++){
-                // printf("%d %d\n",id, nthrds);
                 for(j=k+1;j<n;j++){
                     a[i][j] -= l[i][k]*u[k][j];
                 }

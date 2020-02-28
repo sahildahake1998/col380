@@ -3,7 +3,7 @@
 #include <mpi.h>
 #include<sys/time.h>
 
-void Multiply_Serial(float *A, float *B, float *C, int m, int n, int p){
+void Multiply_Serial(double *A, double *B, double *C, int m, int n, int p){
 	int i, j, k;
 	for (i = 0; i < m; i++){
 		for (j = 0; j < p; j++){
@@ -17,6 +17,7 @@ void Multiply_Serial(float *A, float *B, float *C, int m, int n, int p){
 void Matrix_Multiply(double *A, double *B, double *C, int m, int n, int p, int total_processes, int rank) {
 	int i,j,k;
 	int temp = m/total_processes;
+	if (temp<1) {return;}
 	if (rank*temp + temp <= m) {
 		for (i = rank*temp; i<rank*temp + temp; i++) {
 			for (j = 0; j < p; j++){
@@ -60,11 +61,13 @@ int IsEqual(double *A, double *B, int m, int n) {
 		int i, j;
 	for (i=0; i<m; i++) {
 		for (j=0; j<n; j++) {
-			if (A[i*m + n] == B[i*m + n]) {
+			if (A[i*m + n] != B[i*m + n]) {
+				// printf("matrices not equal\n");
 				return 0;
 			}
 		}
 	}
+	// printf("matrices equal\n");
 	return 1;
 }
 
@@ -85,6 +88,9 @@ int main() {
 	double* B = (double*) malloc(N*sizeof(double));
     double* answer = (double*) malloc(N*sizeof(double));
 	double* C = (double*) malloc(N*sizeof(double));
+    double* answer_serial = (double*) malloc(N*sizeof(double));
+
+
 	
 	MPI_Init(NULL,NULL);
 	int comm_sz;
@@ -101,8 +107,8 @@ int main() {
 		MPI_Recv(B,N,MPI_DOUBLE,0,21,MPI_COMM_WORLD,MPI_STATUS_IGNORE);
 		int m=size, n = 32, p = size;
 		for (int i=1; i<comm_sz; i++) {
-			Matrix_Multiply(B,A,C,m,n,p,comm_sz,i);
-			print_matrix(C);
+			Matrix_Multiply(A,B,C,m,n,p,comm_sz,i);
+			// printf("matrix C after process : %d\n",i),print_matrix(C,size*size);
 			MPI_Send(C,size*size,MPI_DOUBLE,0,21,MPI_COMM_WORLD);
 		}		
 	}
@@ -116,18 +122,19 @@ int main() {
 			B[i] = (rand()/(double)RAND_MAX);
 		}
 		printf("matrices initiated\n");
-		printf("matrix A is :- \n"),print_matrix(A);
-		printf("matrix B is :- \n"),print_matrix(B);
+		// printf("matrix A is :- \n"),print_matrix(A,32*size);
+		// printf("matrix B is :- \n"),print_matrix(B,32*size);
 		for (int i=1;i<comm_sz;i++) {
 			MPI_Send(&size,1,MPI_INT,i,21,MPI_COMM_WORLD);
-			printf("sent size\n");
+			// printf("sent size\n");
 			MPI_Send(A,32*size,MPI_DOUBLE,i,21,MPI_COMM_WORLD);
-			printf("sent A\n");
+			// printf("sent A\n");
 			MPI_Send(B,32*size,MPI_DOUBLE,i,21,MPI_COMM_WORLD);
-			printf("sent B\n");	
+			// printf("sent B\n");	
 		}
-		int m=N, n = 32, p = N;
-		Matrix_Multiply(A,B,C,m,n,p,comm_sz,my_rank);
+		int m=size, n = 32, p = size;
+		Matrix_Multiply(A,B,answer,m,n,p,comm_sz,my_rank);
+		// printf("matrix answer after process : %d\n",0),print_matrix(answer,size*size);
 		for (int i=1;i<comm_sz;i++) {
 			MPI_Recv(C,size*size,MPI_DOUBLE,i,21,MPI_COMM_WORLD,MPI_STATUS_IGNORE);
 			for (int j=0;j<size*size;j++) {
@@ -135,9 +142,12 @@ int main() {
 					answer[j] = C[j];
 				}
 			}
-			print_matrix(answer);
 			// MPI_Recv(C,MAX_CAPACITY,MPI_double,i,2,MPI_COMM_WORLD,MPI_STATUS_IGNORE)
 		}
+		printf("answer using parallel is : "), print_matrix(answer,size*size);
+		Multiply_Serial(A,B,answer_serial,size,32,size);
+		IsEqual(answer,answer_serial,size*size,size*size);
+
 	} 
 
 		

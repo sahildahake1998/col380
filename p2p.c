@@ -14,12 +14,11 @@ void Multiply_Serial(double *A, double *B, double *C, int m, int n, int p){
 	}
 }	
 
-void Matrix_Multiply(double *A, double *B, double *C, int m, int n, int p, int total_processes, int rank) {
+void Matrix_Multiply(double *A, double *B, double *C, int m, int n, int p, int comm_sz, int my_rank) {
 	int i,j,k;
-	int temp = m/total_processes;
-	if (temp<1) {return;}
-	if (rank*temp + temp <= m) {
-		for (i = rank*temp; i<rank*temp + temp; i++) {
+	int work = m/comm_sz;
+	if (my_rank == comm_sz-1 && (my_rank+1)*work < m) {
+		for (i=my_rank*work; i<m; i++) {
 			for (j = 0; j < p; j++){
 				C[i*p + j] = 0;
 				for (k = 0; k < n; k++)
@@ -28,7 +27,7 @@ void Matrix_Multiply(double *A, double *B, double *C, int m, int n, int p, int t
 		}
 	}
 	else {
-		for (i=rank*temp; i<m;i++) {
+		for (i=my_rank*work; i<(my_rank+1)*work; i++) {
 			for (j = 0; j < p; j++){
 				C[i*p + j] = 0;
 				for (k = 0; k < n; k++)
@@ -37,37 +36,20 @@ void Matrix_Multiply(double *A, double *B, double *C, int m, int n, int p, int t
 		}
 	}
 
-
-	// 	int i, j, k, temp;
-	// 	temp = n/total_processes;
-	// 	for (i=0; i<m; i++) {
-	// 		for (j=0; j<p; j++) {
-	// 			C[i*p+j] = 0;
-	// 			if (rank*temp + temp <= n) {
-	// 				for (k=rank*temp; k<rank*temp + temp; k++) {
-	// 					C[i*p+j] += A[i*n+k]*B[k*p+j];
-	// 				}					
-	// 			}
-	// 			else {
-	// 				for (k=rank*temp; k<n; k++) {
-	// 					C[i*p+j] += A[i*n+k]*B[k*p+j];
-	// 				}
-	// 			}
-	// 		}
-	// 	}
-	}
+}
 
 int IsEqual(double *A, double *B, int m, int n) {
 		int i, j;
 	for (i=0; i<m; i++) {
 		for (j=0; j<n; j++) {
+			printf("(%0.2f,%0.2f),",A[i*m + n],B[i*m + n]);
 			if (A[i*m + n] != B[i*m + n]) {
-				// printf("matrices not equal\n");
+				printf("matrices not equal\n");
 				return 0;
 			}
 		}
 	}
-	// printf("matrices equal\n");
+	printf("matrices equal\n");
 	return 1;
 }
 
@@ -75,7 +57,7 @@ void print_matrix(double *A,int a) {
 	// printf("size of this matrix = %d\n",sizeof(A[0]));
 	printf("(");
 	for (int i=0;i<a;i++) {
-		printf("%0.3f, ",A[i]);
+		printf("%0.6f, ",A[i]);
 	}
 	printf(")\n");
 
@@ -86,12 +68,11 @@ int main() {
 	int size;
 	double* A = (double*) malloc(N*sizeof(double));
 	double* B = (double*) malloc(N*sizeof(double));
-    double* answer = (double*) malloc(N*sizeof(double));
-	double* C = (double*) malloc(N*sizeof(double));
-    double* answer_serial = (double*) malloc(N*sizeof(double));
+    double* answer = (double*) malloc(N*N*sizeof(double));
+	double* C = (double*) malloc(N*N*sizeof(double));
+    double* answer_serial = (double*) malloc(N*N*sizeof(double));
 
-
-	
+    struct timeval start, end; 
 	MPI_Init(NULL,NULL);
 	int comm_sz;
 	int my_rank;
@@ -106,15 +87,19 @@ int main() {
 		MPI_Recv(A,N,MPI_DOUBLE,0,21,MPI_COMM_WORLD,MPI_STATUS_IGNORE);
 		MPI_Recv(B,N,MPI_DOUBLE,0,21,MPI_COMM_WORLD,MPI_STATUS_IGNORE);
 		int m=size, n = 32, p = size;
-		for (int i=1; i<comm_sz; i++) {
-			Matrix_Multiply(A,B,C,m,n,p,comm_sz,i);
-			// printf("matrix C after process : %d\n",i),print_matrix(C,size*size);
-			MPI_Send(C,size*size,MPI_DOUBLE,0,21,MPI_COMM_WORLD);
-		}		
+		for (int i=1;i<comm_sz;i++) {
+			if (my_rank == i) {
+				Matrix_Multiply(A,B,C,m,n,p,comm_sz,i);
+				// printf("matrix C after process : %d\n",i),print_matrix(C,size*size);
+				MPI_Send(C,size*size,MPI_DOUBLE,0,21,MPI_COMM_WORLD);	
+			}
+		}
 	}
+
 	else {
 		printf("enter N = \n");
 		scanf("%d",&size);
+		gettimeofday(&start, NULL); 
 		for (int i=0; i<32*size; i++) {
 			A[i] = (rand()/(double)RAND_MAX);
 		}
@@ -139,15 +124,21 @@ int main() {
 			MPI_Recv(C,size*size,MPI_DOUBLE,i,21,MPI_COMM_WORLD,MPI_STATUS_IGNORE);
 			for (int j=0;j<size*size;j++) {
 				if (C[j] != 0) {
+					// printf("going to update answer matrix\n");
 					answer[j] = C[j];
 				}
 			}
 			// MPI_Recv(C,MAX_CAPACITY,MPI_double,i,2,MPI_COMM_WORLD,MPI_STATUS_IGNORE)
 		}
-		printf("answer using parallel is : "), print_matrix(answer,size*size);
+		gettimeofday(&end, NULL); 
+    	double time_taken;
+    	time_taken = (end.tv_sec - start.tv_sec) * 1e6; 
+    	time_taken = (time_taken + (end.tv_usec - start.tv_usec)) * 1e-6;
+        printf("Time Taken: %lf\n",time_taken);
+		// printf("answer using parallel is : "), print_matrix(answer,size*size);
 		Multiply_Serial(A,B,answer_serial,size,32,size);
-		IsEqual(answer,answer_serial,size*size,size*size);
-
+		// printf("answer using serial is : "), print_matrix(answer_serial,size*size);
+		// IsEqual(answer,answer_serial,size*size,size*size);
 	} 
 
 		
@@ -159,7 +150,8 @@ int main() {
 	// int* ptr = &a ;
 	// printf("%d\n",a);
 	// printf("%p\n",ptr);	
-	MPI_Finalize();
+	MPI_Finalize(); 
+
 	return 0;
 
 }

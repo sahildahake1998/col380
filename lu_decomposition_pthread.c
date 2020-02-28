@@ -6,7 +6,6 @@
 #include<pthread.h>
 #define N 10000
 
-
 int max_threads;
 int n;
 double **a;
@@ -157,21 +156,11 @@ int main(int argc, char *argv[]){
             for (i = 0; i<max_threads; i++){
                 pthread_join(threads[i], NULL);
             }
-
-
-            
-            // for(i=k+1;i<n;i++){
-            //     for(j=k+1;j<n;j++){
-            //         a[i][j] -= l[i][k]*u[k][j];
-            //     }
-            // }
-
         }
 
         gettimeofday(&end, NULL); 
         time_taken = (end.tv_sec - start.tv_sec) * 1e6; 
         time_taken = (time_taken + (end.tv_usec - start.tv_usec)) * 1e-6; 
-
 
         printf("Time Taken: %lf\n",time_taken);
         free(a);

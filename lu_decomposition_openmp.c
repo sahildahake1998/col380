@@ -30,6 +30,7 @@ int main(int argc, char *argv[]){
         for(i=0;i<n;i++){
             for(j=0;j<n;j++){
                 a[i][j] = drand48()*1000;
+                // printf("(%d,%d) = %f\n",i,j,a[i][j]);
             }
         }
         double maxArray[max_threads];
@@ -57,8 +58,7 @@ int main(int argc, char *argv[]){
         printf("Entered the main forloop\n");
 
         for(k=0;k<n;k++){
-            printf("%d\n",k);
-
+            // printf("k = %d \n",k);
             #pragma omp parallel
             {
                 nthrds = omp_get_num_threads();
@@ -72,6 +72,7 @@ int main(int argc, char *argv[]){
                     stopIndex = n;
                 }
                 max = a[startIndex][k];
+                k_dash = startIndex;
                 for(i = startIndex+1; i < stopIndex; i++){
                     if(max < abs(a[i][k])){
                         max = abs(a[i][k]);
@@ -90,9 +91,6 @@ int main(int argc, char *argv[]){
                     k_dash = k_dashArray[i];
                 }
             }
-
-
-
 
             // max = 0;
             // for(i=k;i<n;i++){

@@ -33,6 +33,7 @@ int main(int argc, char *argv[]){
 		        }
 		    // printf("executed parallel\n");
     	// }
+                
         printf("initialisation done \n");
         for (int i=0;i<sizeof(&a);i++) {
             for (int j=0; j<sizeof(&a[i]);j++) {
